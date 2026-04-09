@@ -4,6 +4,7 @@ import { join } from 'node:path'
 
 const CONFIG_DIR = join(homedir(), '.sonar')
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json')
+const ACCOUNTS_FILE = join(CONFIG_DIR, 'accounts.json')
 
 export type Vendor = 'openai' | 'anthropic'
 
@@ -13,6 +14,80 @@ export interface Config {
   vendor?: Vendor
   feedRender?: string
   feedWidth?: number
+}
+
+export interface AccountEntry {
+  name: string
+  token: string
+  apiUrl: string
+  vendor?: Vendor
+}
+
+export interface AccountsConfig {
+  activeAccount: string
+  accounts: AccountEntry[]
+}
+
+/**
+ * Migrate legacy single-account config.json to multi-account accounts.json.
+ * Returns true if migration occurred, false if already migrated or no legacy config.
+ */
+export function migrateConfig(opts?: {
+  configDir?: string
+}): boolean {
+  const dir = opts?.configDir ?? CONFIG_DIR
+  const legacyPath = join(dir, 'config.json')
+  const accountsPath = join(dir, 'accounts.json')
+
+  // Already migrated or no legacy config
+  if (existsSync(accountsPath) || !existsSync(legacyPath)) {
+    return false
+  }
+
+  let legacy: Config
+  try {
+    const raw = readFileSync(legacyPath, 'utf8')
+    legacy = JSON.parse(raw) as Config
+  } catch {
+    return false
+  }
+
+  if (!legacy.token) return false
+
+  const accounts: AccountsConfig = {
+    activeAccount: 'default',
+    accounts: [
+      {
+        name: 'default',
+        token: legacy.token,
+        apiUrl: legacy.apiUrl ?? 'https://api.sonar.8640p.info/graphql',
+        ...(legacy.vendor ? { vendor: legacy.vendor } : {}),
+      },
+    ],
+  }
+
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(accountsPath, JSON.stringify(accounts, null, 2), 'utf8')
+  return true
+}
+
+/**
+ * Read multi-account config. Falls back to legacy single-account config.
+ */
+export function readAccountsConfig(opts?: {
+  configDir?: string
+}): AccountsConfig | null {
+  const dir = opts?.configDir ?? CONFIG_DIR
+  const accountsPath = join(dir, 'accounts.json')
+
+  if (!existsSync(accountsPath)) return null
+
+  try {
+    const raw = readFileSync(accountsPath, 'utf8')
+    return JSON.parse(raw) as AccountsConfig
+  } catch {
+    return null
+  }
 }
 
 export function readConfig(): Config {
