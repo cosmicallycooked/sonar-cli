@@ -23,7 +23,8 @@
     "sonar": "tsx src/cli.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "tsc"
+    "prepublishOnly": "tsc",
+    "test": "vitest run"
   },
   "dependencies": {
     "better-sqlite3": "^11",
@@ -45,6 +46,7 @@
     "biome": "^0.3.3",
     "ink-link": "^5.0.0",
     "tsx": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.4"
   }
 }
