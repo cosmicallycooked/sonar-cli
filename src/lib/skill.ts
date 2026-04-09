@@ -1,291 +1,308 @@
-import { writeFileSync, mkdirSync } from 'node:fs'
+// THIS FILE IS AUTO-GENERATED. Do not edit manually.
+// Run: pnpm generate:skill
+// See: scripts/generate-skill.ts
+import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { join, dirname } from 'node:path'
 import { homedir } from 'node:os'
 
 const SKILL_CONTENT = `---
 name: sonar
-description: Sonar CLI — manage interests, suggestions, indexing jobs, and account config for the Sonar social intelligence platform. Use when the user asks about their Sonar account, wants to create/list interests, check suggestions, trigger indexing, or configure the CLI.
+description: Sonar CLI — view and triage your feed, manage topics, trigger refresh jobs, and manage local Sonar config/data.
 homepage: https://sonar.sh
 user-invocable: true
 allowed-tools: Bash
 argument-hint: [command and options]
-metadata: {"openclaw":{"emoji":"📡","primaryEnv":"SONAR_API_KEY","requires":{"bins":["sonar"],"env":["SONAR_API_KEY"]}}}
+metadata: {"openclaw":{"emoji":"📡","requires":{"bins":["sonar"]}}}
 ---
 
 # Sonar CLI
 
-Sonar is a social intelligence platform. Use the \`sonar\` CLI to manage the user's account.
+All commands are invoked as: \`sonar <command> [subcommand] [flags]\`.
 
-All commands are invoked as: \`sonar <command> [subcommand] [flags]\`
-
----
-
-## Account & Config
+## sonar account add
 
 \`\`\`bash
-# Show account info, plan usage, and suggestion counts
+sonar account add
+sonar account add --alias <value>  # Account alias (default: random)
+sonar account add --api-url <value>  # Custom API URL
+\`\`\`
+
+## sonar account
+
+\`\`\`bash
 sonar account
+sonar account --json  # Raw JSON output
+\`\`\`
 
-# Show current CLI config (API URL, vendor, token presence)
+## sonar account remove
+
+\`\`\`bash
+sonar account remove
+sonar account remove --force  # Remove even if active
+\`\`\`
+
+## sonar account rename
+
+\`\`\`bash
+sonar account rename
+\`\`\`
+
+## sonar account switch
+
+\`\`\`bash
+sonar account switch
+\`\`\`
+
+## sonar archive
+
+\`\`\`bash
+sonar archive
+sonar archive --id <value>  # Suggestion ID to archive
+\`\`\`
+
+## sonar config env
+
+\`\`\`bash
+sonar config env
+\`\`\`
+
+## sonar config
+
+\`\`\`bash
 sonar config
+\`\`\`
 
-# Set AI vendor preference for --from-prompt (saved to ~/.sonar/config.json)
-sonar config set vendor openai      # or: anthropic
+## sonar config nuke
 
-# Initialise workspace from environment variables
-# Requires: SONAR_API_KEY
+\`\`\`bash
+sonar config nuke
+sonar config nuke --confirm  # Pass to confirm deletion
+\`\`\`
+
+## sonar config set
+
+\`\`\`bash
+sonar config set
+sonar config set --key <value>  # Config key: vendor, feed-render, feed-width
+sonar config set --value <value>  # Value to set
+\`\`\`
+
+## sonar config setup
+
+\`\`\`bash
 sonar config setup
+sonar config setup --key <value>  # API key to use
 \`\`\`
 
----
-
-## Interests
-
-Interests are named topic areas with keywords and related topics that drive suggestion matching.
+## sonar config skill
 
 \`\`\`bash
-# List all interests
-sonar interests
-
-# Create manually
-sonar interests create --name "AI Agents" --description "LLM-based agents and tooling" \\
-  --keywords "agents,llm,tools,mcp" --topics "machine learning,AI safety"
-
-# Generate fields from a natural language prompt (uses OPENAI_API_KEY or ANTHROPIC_API_KEY)
-sonar interests create --from-prompt "I want to follow the Rust ecosystem and systems programming"
-
-# Generate with a specific vendor (overrides config preference)
-sonar interests create --from-prompt "DeFi and crypto protocols" --vendor anthropic
-
-# Update an existing interest (full replace)
-sonar interests update --id <id> --name "New Name" --keywords "kw1,kw2"
-
-# Add keywords to an existing interest (fetches current, merges, sends full list)
-sonar interests update --id <id> --add-keywords "mcp,a2a,langgraph"
-
-# Remove keywords from an existing interest
-sonar interests update --id <id> --remove-keywords "old-term,deprecated-kw"
-
-# Add and remove keywords in one shot
-sonar interests update --id <id> --add-keywords "vibe-coding" --remove-keywords "cursor"
-
-# Same flags work for related topics
-sonar interests update --id <id> --add-topics "AI safety" --remove-topics "machine learning"
-
-# Combine keyword/topic patching with a name change
-sonar interests update --id <id> --name "New Name" --add-keywords "new-kw"
-
-# Regenerate all fields from a new prompt (replaces everything)
-sonar interests update --id <id> --from-prompt "Rust and WebAssembly tooling"
-
-# Output raw JSON (agent-friendly)
-sonar interests --json
+sonar config skill
+sonar config skill --install  # Install to ~/.claude/skills/sonar/SKILL.md
+sonar config skill --dest <value>  # Write to a custom path
+sonar config skill --force  # Overwrite even if file was modified
 \`\`\`
 
-**AI vendor resolution order:**
-1. \`--vendor\` flag
-2. \`SONAR_AI_VENDOR\` environment variable
-3. \`vendor\` in \`~/.sonar/config.json\` (set via \`sonar config set vendor\`)
-4. Defaults to \`openai\`
-
-Required env vars: \`OPENAI_API_KEY\` (OpenAI) or \`ANTHROPIC_API_KEY\` (Anthropic)
-
----
-
-## Feed
-
-Scored tweet feed from your social network, filtered by interests.
+## sonar data backup
 
 \`\`\`bash
-# Show feed (default: last 12h, limit 20, card layout)
+sonar data backup
+sonar data backup --out <value>  # Backup output path (default: ~/.sonar/data-backup-<timestamp>.db)
+sonar data backup --json  # Raw JSON output
+\`\`\`
+
+## sonar data path
+
+\`\`\`bash
+sonar data path
+\`\`\`
+
+## sonar data pull
+
+\`\`\`bash
+sonar data pull
+\`\`\`
+
+## sonar data restore
+
+\`\`\`bash
+sonar data restore
+sonar data restore --from <value>  # Backup database path to restore from
+sonar data restore --to <value>  # Target database path (default: local sonar DB path)
+sonar data restore --json  # Raw JSON output
+\`\`\`
+
+## sonar data sql
+
+\`\`\`bash
+sonar data sql
+\`\`\`
+
+## sonar data verify
+
+\`\`\`bash
+sonar data verify
+sonar data verify --path <value>  # Database path (default: local sonar DB path)
+sonar data verify --json  # Raw JSON output
+\`\`\`
+
+## sonar feed
+
+\`\`\`bash
 sonar feed
-
-# Time window
-sonar feed --hours 24
-sonar feed --days 3
-
-# Limit results
-sonar feed --limit 50
-
-# Output layout
-sonar feed --render card    # default — rich card view
-sonar feed --render table   # compact table view
-sonar feed --width 100      # card body width in columns
-
-# Raw JSON output (agent-friendly)
-sonar feed --json
+sonar feed --hours N  # Look back N hours (default: 12)
+sonar feed --days N  # Look back N days
+sonar feed --limit N  # Result limit (default: 20)
+sonar feed --offset N  # Skip first N results (default: 0)
+sonar feed --kind <value>  # Feed source: default|bookmarks|followers|following
+sonar feed --render <value>  # Output layout: card|table
+sonar feed --width N  # Card width in columns
+sonar feed --json  # Raw JSON output
+sonar feed --follow  # Continuously poll for new items
+sonar feed --interval N  # Poll interval in seconds (default: 30)
 \`\`\`
 
----
-
-## Suggestions (inbox)
+## sonar
 
 \`\`\`bash
-# List suggestions (default: inbox, limit 20)
-sonar inbox
-
-# Filter by status
-sonar inbox --status inbox
-sonar inbox --status later
-sonar inbox --status replied
-sonar inbox --status archived
-
-# Change limit
-sonar inbox --limit 50
-
-# Update a suggestion's status (positional id replaced with --id flag)
-sonar inbox read --id <id>
-sonar inbox skip --id <id>
-sonar inbox later --id <id>
-sonar inbox archive --id <id>
-
-# Raw JSON output
-sonar inbox --json
+sonar
+sonar --hours N  # Look back N hours (default: 12)
+sonar --days N  # Look back N days
+sonar --limit N  # Result limit (default: 20)
+sonar --kind <value>  # Feed source: default|bookmarks|followers|following
+sonar --render <value>  # Output layout: card|table
+sonar --width N  # Card width in columns
+sonar --json  # Raw JSON output
+sonar --no-interactive  # Interactive session mode (default: on, use --no-interactive to disable)
+sonar --vendor <value>  # AI vendor: openai|anthropic
 \`\`\`
 
----
-
-## Ingest
-
-Trigger background jobs to ingest data.
+## sonar later
 
 \`\`\`bash
-# Trigger specific jobs
-sonar ingest tweets        # Ingest recent tweets from social graph
-sonar ingest bookmarks     # Ingest X bookmarks (requires OAuth token)
-sonar interests match      # Match interests against ingested tweets (default: last 24h)
-
-# Match tweet window (capped by plan: free=3d, pro=7d, enterprise=14d)
-sonar interests match --days 1   # default
-sonar interests match --days 3   # broader window (free plan max)
-sonar interests match --days 7   # pro plan max
-
-# Show current job queue counts (one-shot)
-sonar monitor
-
-# Live polling view of job queues
-sonar monitor --watch
+sonar later
+sonar later --id <value>  # Suggestion ID to save for later
 \`\`\`
 
----
-
-## Local Data
-
-Sync feed, suggestions, and interests to a local SQLite DB (\`~/.sonar/data.db\`) for offline querying.
+## sonar refresh
 
 \`\`\`bash
-# Full download — wipes and repopulates ~/.sonar/data.db
-sonar config data download
-
-# Incremental sync — upserts records newer than last sync
-sonar config data sync
-
-# Open an interactive sqlite3 REPL
-sonar config data sql
-
-# Print path to the local DB file
-sonar config data path
+sonar refresh
+sonar refresh --bookmarks  # Sync bookmarks from X
+sonar refresh --likes  # Sync likes from X
+sonar refresh --graph  # Rebuild social graph
+sonar refresh --tweets  # Index tweets across network
+sonar refresh --suggestions  # Regenerate suggestions
 \`\`\`
 
-### Schema
+## sonar skip
 
-\`\`\`sql
--- Core tweet content (shared by feed and suggestions)
-tweets (
-  id TEXT PRIMARY KEY,       -- Sonar tweet UUID
-  xid TEXT,                  -- Twitter/X tweet ID
-  text TEXT,
-  created_at TEXT,
-  like_count INTEGER,
-  retweet_count INTEGER,
-  reply_count INTEGER,
-  author_username TEXT,
-  author_display_name TEXT,
-  author_followers_count INTEGER,
-  author_following_count INTEGER
-)
-
--- Feed items (scored, keyword-matched tweets)
-feed_items (
-  tweet_id TEXT PRIMARY KEY, -- FK → tweets.id
-  score REAL,
-  matched_keywords TEXT,     -- JSON array of strings
-  synced_at TEXT
-)
-
--- Inbox suggestions
-suggestions (
-  suggestion_id TEXT PRIMARY KEY,
-  tweet_id TEXT,             -- FK → tweets.id
-  score REAL,
-  status TEXT,               -- INBOX | READ | SKIPPED | LATER | ARCHIVED
-  relevance TEXT,
-  projects_matched TEXT,     -- JSON (count of matched interests)
-  metadata TEXT,             -- JSON
-  synced_at TEXT
-)
-
--- Interests (topics/keywords that drive matching)
-interests (
-  id TEXT PRIMARY KEY,       -- nanoId
-  name TEXT,
-  description TEXT,
-  keywords TEXT,             -- JSON array
-  topics TEXT,               -- JSON array
-  created_at TEXT,
-  updated_at TEXT,
-  synced_at TEXT
-)
-
--- Internal sync state
-sync_state (
-  key TEXT PRIMARY KEY,      -- e.g. "last_synced_at"
-  value TEXT
-)
+\`\`\`bash
+sonar skip
+sonar skip --id <value>  # Suggestion ID to skip
 \`\`\`
 
----
+## sonar status
 
-## Environment Variables
+\`\`\`bash
+sonar status
+sonar status --watch  # Poll and refresh every 2 seconds
+sonar status --json  # Raw JSON output
+\`\`\`
+
+## sonar topics add
+
+\`\`\`bash
+sonar topics add
+sonar topics add --description <value>  # Optional description (auto-generated if omitted)
+sonar topics add --json  # Raw JSON output
+\`\`\`
+
+## sonar topics delete
+
+\`\`\`bash
+sonar topics delete
+sonar topics delete --json  # Raw JSON output
+\`\`\`
+
+## sonar topics edit
+
+\`\`\`bash
+sonar topics edit
+sonar topics edit --name <value>  # New name
+sonar topics edit --description <value>  # New description
+sonar topics edit --json  # Raw JSON output
+\`\`\`
+
+## sonar topics
+
+\`\`\`bash
+sonar topics
+sonar topics --json  # Raw JSON output
+\`\`\`
+
+## sonar topics suggest
+
+\`\`\`bash
+sonar topics suggest
+sonar topics suggest --vendor <value>  # AI vendor: openai|anthropic
+sonar topics suggest --count N  # Number of suggestions (default: 5)
+sonar topics suggest --json  # Raw JSON output
+\`\`\`
+
+## sonar topics view
+
+\`\`\`bash
+sonar topics view
+\`\`\`
+
+## Environment variables
 
 | Variable | Purpose |
 |---|---|
-| \`SONAR_API_KEY\` | API key for authentication (overrides config file) |
-| \`SONAR_API_URL\` | Backend URL (default: \`http://localhost:8000/graphql\`) |
-| \`SONAR_AI_VENDOR\` | AI vendor for \`--from-prompt\` (overrides config file) |
+| \`SONAR_API_URL\` | Backend URL (defaults to production GraphQL endpoint) |
+| \`SONAR_AI_VENDOR\` | Vendor override for AI-assisted operations (\`openai\` or \`anthropic\`) |
+| \`SONAR_FEED_RENDER\` | Default feed renderer override |
+| \`SONAR_FEED_WIDTH\` | Default card width override |
 | \`OPENAI_API_KEY\` | Required when vendor is \`openai\` |
 | \`ANTHROPIC_API_KEY\` | Required when vendor is \`anthropic\` |
-
----
-
-## Config file
-
-Stored at \`~/.sonar/config.json\`:
-
-\`\`\`json
-{
-  "token": "snr_...",
-  "apiUrl": "https://api.sonar.sh/graphql",
-  "vendor": "openai"
-}
-\`\`\`
 `
 
 const DEFAULT_INSTALL_PATH = join(homedir(), '.claude', 'skills', 'sonar', 'SKILL.md')
 
-export function writeSkillTo(dest?: string, install?: boolean): void {
+function sha256(content: string): string {
+  return createHash('sha256').update(content).digest('hex')
+}
+
+function safeWrite(target: string, content: string, force: boolean): void {
+  if (existsSync(target) && !force) {
+    const existing = readFileSync(target, 'utf8')
+    if (existing === content) {
+      process.stdout.write(`SKILL.md is already up to date: ${target}\n`)
+      process.exit(0)
+    }
+    // File exists and differs — user may have customized it
+    process.stderr.write(
+      `SKILL.md has been modified: ${target}\n` +
+      `Use --force to overwrite, or manually merge.\n` +
+      `New version hash: ${sha256(content).slice(0, 8)}\n`
+    )
+    process.exit(1)
+  }
+  mkdirSync(dirname(target), { recursive: true })
+  writeFileSync(target, content, 'utf8')
+  process.stdout.write(`SKILL.md written to ${target}\n`)
+}
+
+export function writeSkillTo(dest?: string, install?: boolean, force?: boolean): void {
   if (install || dest === '--install') {
-    const target = DEFAULT_INSTALL_PATH
-    mkdirSync(dirname(target), { recursive: true })
-    writeFileSync(target, SKILL_CONTENT, 'utf8')
-    process.stdout.write(`SKILL.md written to ${target}\n`)
+    safeWrite(DEFAULT_INSTALL_PATH, SKILL_CONTENT, force ?? false)
     process.exit(0)
   }
 
   if (dest) {
-    mkdirSync(dirname(dest), { recursive: true })
-    writeFileSync(dest, SKILL_CONTENT, 'utf8')
-    process.stdout.write(`SKILL.md written to ${dest}\n`)
+    safeWrite(dest, SKILL_CONTENT, force ?? false)
     process.exit(0)
   }
 

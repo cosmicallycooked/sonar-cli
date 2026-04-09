@@ -1,7 +1,7 @@
 {
   "name": "@1a35e1/sonar-cli",
-  "version": "0.1.2",
-  "description": "X/Twitter social graph CLI for signal filtering and curation",
+  "version": "0.4.2",
+  "description": "X social graph CLI for signal filtering and curation",
   "type": "module",
   "bin": {
     "sonar": "dist/cli.js"
@@ -13,6 +13,10 @@
   "engines": {
     "node": ">=20"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/1a35e1/sonar-cli"
+  },
   "publishConfig": {
     "access": "public"
   },
@@ -21,29 +25,37 @@
     "version:minor": "pnpm version minor --no-git-tag-version",
     "types": "graphql-codegen --config codegen.ts",
     "sonar": "tsx src/cli.ts",
-    "build": "tsc",
+    "generate:skill": "tsx scripts/generate-skill.ts",
+    "build": "tsx scripts/generate-skill.ts && tsc",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "tsc"
+    "drift:schema:check": "node scripts/check-schema-drift.mjs",
+    "drift:surface:update": "node scripts/update-command-surface-snapshot.mjs",
+    "drift:surface:check": "node scripts/check-command-surface-snapshot.mjs",
+    "drift:docs:check": "node scripts/check-doc-command-parity.mjs",
+    "drift:data:check": "node scripts/check-data-compat.mjs",
+    "drift:skill:check": "node scripts/check-skill-drift.mjs",
+    "drift:check": "pnpm drift:surface:check && pnpm drift:skill:check && pnpm drift:docs:check && pnpm drift:data:check && pnpm drift:schema:check",
+    "prepublishOnly": "tsx scripts/generate-skill.ts && tsc"
   },
   "dependencies": {
-    "better-sqlite3": "^11",
     "date-fns": "4.1.0",
     "graphql": "^16.12.0",
     "graphql-request": "^7.4.0",
     "ink": "^6",
+    "ink-link": "^5.0.0",
     "ink-table": "^3.1.0",
+    "node-sqlite3-wasm": "^0.8.55",
     "pastel": "^3.0.0",
     "react": "^19",
+    "unicode-animations": "^1.0.3",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "@graphql-codegen/cli": "^5.0.5",
     "@graphql-codegen/typescript-graphql-request": "^6.4.0",
-    "@types/better-sqlite3": "^7",
     "@types/node": "^22",
     "@types/react": "^19",
     "biome": "^0.3.3",
-    "ink-link": "^5.0.0",
     "tsx": "^4",
     "typescript": "^5"
   }

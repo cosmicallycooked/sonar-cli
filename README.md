@@ -1,278 +1,147 @@
-# 🔊 Sonar (Preview)
+# 🔊 Sonar (Alpha)
 
-Experimental X CLI for OpenClaw 🦞 power users.
+Agent optimised [X](https://x.com) CLI for founders who want to stay ahead of the curve.
 
-Sonar matches interests from your X graph using various AI pipelines. We built this to automate our social intelligence.
+We got tired of missing important content in our feed and built Sonar to fix it.
 
-This cli has been designed to handover indexing and consumption to agents.
-
-* Pipe it into scripts,
-* automate your morning briefing,
-* Or just discover tweets you probably missed out on the web interface.
-
----
+Sonar matches your interests from your X network, filtering only relevant content from your graph using a variety of AI pipelines. We built this to automate our social intelligence at [@LighthouseGov](https://x.com/LighthouseGov).
 
 ## Get started
 
-* Register with `X` to get an API key from `https://sonar.8640p.info/`
-  * Learn more about which [scopes](#scopes) we request and why.
+* Login with your `X` account to obtain a [free API key](https://sonar.8640p.info/).
 
 Install the CLI
 
 ```sh
-pnpm add -g @1a35e1/sonar-cli
+pnpm add -g @1a35e1/sonar-cli@latest
 ```
 
 Register your API key.
 
 ```sh
-# Make "SONAR_API_KEY" avaliable in your env
-export SONAR_API_KEY=snr_xxxxx
-
-# or, manually register
-sonar config setup key=<YOUR_API_KEY>
+sonar account add snr_xxxxx
 ```
 
-View your account to ensure evrything works.
+View your account status:
 
 ```sh
-sonar account
+sonar status
 ```
 
-Ingest your first `tweets` and check to `monitor` progress.
+Run your first refresh to index tweets and generate suggestions:
 
-> The first time this you run this command it will take some time.
+> The first time you run this it will take some time.
 
 ```sh
-sonar ingest tweets
-
-sonar ingest monitor
-sonar ingest monitor --watch
+sonar refresh
+sonar status --watch
 ```
 
 ---
 
 ## Scopes
 
-* We currently request `read:*` and `offline:processing` scopes based on <<https://docs.x.com/fundamentals/authentication/oauth-2-0/>. If there is an appite
+* We currently request `read:*` and `offline:processing` scopes
+* This allows us to read your feed, bookmarks, followers/following, and other account data to power our signal filtering and topic suggestions.
 
-* So we can stay connected to your account until you revoke access.
-* Posts you’ve liked and likes you can view.
-* All the posts you can view, including posts from protected accounts.
-* Accounts you’ve muted.
-* Accounts you’ve blocked.
-* People who follow you and people who you follow.
-* All your Bookmarks.
-* Lists, list members, and list followers of lists you’ve created or are a member of, including private lists.
-* Any account you can view, including protected accounts.
 
-## Why Sonar exists
-
-Setting up your own social data pipeline is genuinely awful. You're looking at OAuth flows, rate limit math, pagination handling, webhook plumbing, deduplication logic, and a SQLite schema you'll regret in three weeks — before you've seen a single useful result. Most developers who try it abandon it halfway through.
-
-**Sonar skips all of that. Get actionalable data for OpenClaw in 15 minutes.**
-
-We believe your data is yours. So you want to go deeper than our platform allows — build your own models, run custom queries, pipe it into your own tooling — you can download everything we have indexed on your behalf into a local SQLite database and do whatever you want with it:
-
-```bash
-pnpm run cli -- data download   # full snapshot → ~/.sonar/data.db
-pnpm run cli -- data sync       # incremental updates
-pnpm run cli -- data sql        # drop into a sqlite3 shell
-```
-
-No lock-in. If you outgrow us, you leave with your data intact.
-
-## Design philosophy
-
-There's a quiet shift happening in how developer tools are built.
-
-In the early web2 era, API-first was a revelation. Stripe, Twilio, Sendgrid — companies that exposed clean REST contracts unlocked entire ecosystems of products built on top of them. The insight was simple: if your service has strong, reliable APIs, anyone can build anything. The interface didn't matter as much as the contract underneath.
-We're at a similar inflection point now, but the interface layer has changed dramatically.
-
-The goal for most workflows today is fire and forget — you define what you want, set it in motion, and let agents handle the execution. That only works if the underlying APIs are strong enough to support complex, long-running ETL pipelines without hand-holding. Sonar is built with that assumption: the API is the product, the CLI is just one interface into it.
-Which raises an interesting question about CLIs themselves. Traditionally a CLI was developer-first by definition — you were writing for someone comfortable with flags, pipes, and man pages. But if the primary consumer of your CLI is increasingly an agent (OpenClaw, a cron job, an LLM with tool access), the design principles shift:
-
-Output should be machine-readable by default. Every command has a --json flag. Agents don't parse card renders.
-Commands should be composable. Small, single-purpose commands that pipe cleanly into each other are more useful to an agent than monolithic workflows.
-
-Side effects should be explicit. An agent calling index --force should know exactly what it's triggering. No surprises.
-Errors should be structured. A human reads an error message. An agent needs to know whether to retry, skip, or escalate.
-
-The CLI still needs to work well for humans — interactive mode, card renders, readable output — but those are progressive enhancements on top of a foundation built for automation. Design for the agent, polish for the human.
-This is what API-first looks like in the agentic era: strong contracts at the service layer, composable interfaces at the CLI layer, and a clear separation between the two.
-
----
-
-## What you can do with it
+## Use cases
 
 ### Morning briefing in one command
 
 Pull everything relevant that happened while you slept:
 
 ```bash
-pnpm run cli -- feed --hours 8 --render card
-pnpm run cli -- inbox --status inbox
+sonar feed --hours 8
 ```
 
-### Track a topic you care about — right now
+### Stream your feed in real time
 
-Create a new interest from a plain English prompt and get content immediately:
+Watch for new items as they appear:
 
 ```bash
-pnpm run cli -- interests create \
-  --from-prompt "I want to follow AI evals and agent infrastructure"
-
-pnpm run cli -- index suggestions --days 1
-pnpm run cli -- feed --hours 24
+sonar feed --follow                      # visual cards, polls every 30s
+sonar feed --follow --json | jq .score   # NDJSON stream for agents
 ```
 
-Sonar generates keywords and topics from your prompt, kicks off indexing, and your feed updates with relevant posts.
+### Discover new topics with AI
+
+Let Sonar suggest topics based on your interests and feed:
+
+```bash
+sonar topics suggest                 # interactive accept/reject
+sonar topics suggest --count 3       # just 3 suggestions
+```
+
+### Track a topic you care about
+
+Add a topic, then refresh:
+
+```bash
+sonar topics add "AI agents"
+sonar refresh
+sonar feed --hours 24
+```
+
+Sonar rebuilds your social graph, indexes recent tweets, and generates suggestions matched against your topics and interest profile.
 
 ### Build a scriptable news digest
 
 Combine `--json` output with `jq` to pipe Sonar content wherever you want:
 
 ```bash
-# Get today's top feed items as JSON
-pnpm run cli -- feed --hours 24 --json | jq '.[] | {author, text, url}'
+# Get today's feed as JSON
+sonar feed --hours 24 --json | jq '.[] | {author: .tweet.user.username, text: .tweet.text}'
 
-# Summarize your inbox with an LLM
-pnpm run cli -- inbox --json | jq '.[].text' | your-summarizer-script
+# Summarize with an LLM
+sonar feed --json | jq '.[].tweet.text' | your-summarizer-script
+
+# Stream high-score items to a file
+sonar feed --follow --json | jq --unbuffered 'select(.score > 0.7)' >> highlights.jsonl
 ```
 
-### Keep your local data fresh and queryable
+### Monitor the pipeline
 
-Download a full SQLite snapshot of your Sonar data and query it directly:
-
-```bash
-pnpm run cli -- data download
-pnpm run cli -- data sql
-# Now you have a full sqlite3 shell — write any query you want
-```
-
-Run incremental syncs on a cron to keep it current:
+Watch the queue in real time while refresh runs:
 
 ```bash
-# crontab: sync every 30 minutes
-*/30 * * * * cd /your/project && pnpm run cli -- data sync
+sonar refresh
+sonar status --watch
 ```
 
 ### Interactive triage
 
-Work through your inbox without leaving the terminal:
+Work through suggestions without leaving the terminal:
 
 ```bash
-pnpm run cli -- inbox --interactive
-pnpm run cli -- feed --interactive
+sonar                    # interactive triage is on by default
+sonar --no-interactive   # disable for scripting
 ```
 
-Mark suggestions as read, skip, archive, or save for later — keyboard-driven.
+Mark suggestions as skip, later, or archive — keyboard-driven.
 
-### Monitor indexing jobs
+### Build your own filters and dashboards (WIP)
 
-Watch the queue in real time while you trigger a full re-index:
+Download your data and build your own tools on top of it.
 
 ```bash
-pnpm run cli -- index          # trigger all jobs
-pnpm run cli -- index status --watch   # watch until complete
+sonar sync # sync data to ~/.sonar/data.db
 ```
+
+No lock-in. If you outgrow us, you leave with your data intact.
 
 ---
 
-## What Sonar doesn't do
+## How Sonar finds relevant content
 
-Sonar is **not a global search engine**. It won't crawl the entire internet or index trending posts from people you've never heard of.
-
-Instead, it searches within your social graph — your followers and the people you follow — up to **2 degrees of separation**. That's it. This is an intentional constraint, not a limitation we're working around.
-
-The reason is practical: API rate limits make broad crawling impossible at any useful refresh frequency. But the reason it works is more interesting — **the people in your network are already a curated signal layer**. The accounts you follow, and the accounts they follow, are a surprisingly high-quality filter for what's relevant to your domain. Sonar's job is to surface what's moving through that graph before it reaches mainstream feeds.
+Sonar surfaces relevant content from your immediate network — the people you follow and who follow you. Your network is already a curated signal layer. Sonar's job is to surface what's moving through that graph before it reaches mainstream feeds.
 
 What this means in practice:
 
 * Results reflect your network's attention, not global virality
-* You won't see noise from accounts you have no connection to
 * The feed gets more useful the more intentional you are about who you follow
-* Adding interests with specific keywords and topics sharpens what Sonar surfaces *within* that graph
-
-If you want global trend monitoring, tools like Brandwatch or Twitter's native search are better fits. Sonar is for developers who want a focused, low-noise signal from a network they've already curated.
-
----
-
-## Pair with OpenClaw
-
-[OpenClaw](https://github.com/openclaw/openclaw) is a local-first autonomous AI agent that runs on your machine and talks to you through WhatsApp, Telegram, Discord, Slack, or iMessage. It can execute shell commands, run on a schedule, and be extended with custom skills.
-
-Sonar + OpenClaw is a natural stack: **Sonar handles the signal filtering and curation, OpenClaw handles delivery and action.** Together they turn your social feed into an ambient intelligence layer you don't have to babysit.
-
-### Morning briefing delivered to your phone
-
-Set up a cron job in OpenClaw to run your Sonar digest and pipe it back to you on Telegram every morning:
-
-```
-# In OpenClaw: schedule a daily 8am briefing
-"Every morning at 8am, run `sonar feed --hours 8 --json` and summarize the top 5 posts for me"
-```
-
-OpenClaw will execute the CLI, pass the JSON output to your LLM, and send a clean summary straight to your phone — no dashboard to open.
-
-### Ask your feed questions in natural language
-
-Because `--json` makes Sonar output composable, OpenClaw can reason over it conversationally:
-
-```
-# Example prompts you can send OpenClaw via WhatsApp:
-"What's the most discussed topic in my Sonar feed today?"
-"Did anyone in my feed mention Uniswap V4 in the last 48 hours?"
-"Summarize my unread Sonar inbox"
-```
-
-Wire it up once as an OpenClaw skill and your feed becomes queryable from any messaging app.
-
-### Triage your inbox hands-free
-
-Combine OpenClaw's scheduling with Sonar's inbox API to automatically mark low-signal suggestions:
-
-```bash
-# Shell script you can hand to OpenClaw as a scheduled skill
-sonar inbox --json | \
-  jq '[.[] | select(.score < 0.4) | .id]' | \
-  xargs -I{} sonar inbox skip {}
-```
-
-Run this nightly and your inbox stays clean without manual triage.
-
-### Get alerted when a topic spikes
-
-Use OpenClaw's Heartbeat (scheduled wake-up) to watch for signal surges and notify you:
-
-```
-# OpenClaw cron: check every 2 hours
-"Run `sonar feed --hours 2 --json` — if there are more than 10 posts about
-'token launchpad' or 'LVR', send me a Telegram alert with the highlights"
-```
-
-Effectively a custom Google Alert, but filtered through your actual interest graph.
-
-### Build a Sonar skill for OpenClaw
-
-The cleanest integration is wrapping Sonar as a reusable OpenClaw skill. Drop a skill file in your OpenClaw workspace:
-
-```typescript
-// skills/sonar.ts
-export async function getFeed(hours = 12) {
-  const { stdout } = await exec(`sonar feed --hours ${hours} --json`);
-  return JSON.parse(stdout);
-}
-
-export async function getInbox() {
-  const { stdout } = await exec(`sonar inbox --json`);
-  return JSON.parse(stdout);
-}
-```
-
-Once registered, OpenClaw can call these tools autonomously whenever it decides they're relevant — no manual prompting required.
-
----
+* Bookmarking and liking content improves your recommendations over time
+* Topics sharpen what Sonar surfaces within your graph
 
 ## Setup
 
@@ -280,143 +149,183 @@ Once registered, OpenClaw can call these tools autonomously whenever it decides 
 
 * Node.js 20+
 * `pnpm`
-* A Sonar API key from [sonar.sh/account](https://sonar.sh/account?tab=api-keys)
-* Optional: `sqlite3` CLI (only needed for `data sql`)
+* A Sonar API key from [sonar.8640p.info](https://sonar.8640p.info/)
 
 ### Install and authenticate
 
 ```bash
-pnpm install
+pnpm add -g @1a35e1/sonar-cli@latest
 
-export SONAR_API_KEY="your_api_key_here"
-pnpm run cli -- init
+sonar account add <YOUR_API_KEY>
 ```
-
-`init` writes your config to `~/.sonar/config.json`. If `SONAR_API_KEY` is set in your environment, it always takes precedence.
 
 Verify it works:
 
 ```bash
-pnpm run cli -- account
-pnpm run cli -- interests
+sonar status
+sonar topics
 ```
 
 ---
 
 ## Command Reference
 
-### Account & Config
+### Default — triage suggestions
 
 ```bash
-pnpm run cli -- account              # plan, usage, suggestion counters
-pnpm run cli -- config               # show current config
-pnpm run cli -- config set vendor anthropic      # or openai
-pnpm run cli -- config set feed-render card      # or table
-pnpm run cli -- config set feed-width 100
+sonar                                # interactive triage (default)
+sonar --hours 24                     # widen time window
+sonar --days 3                       # last 3 days
+sonar --kind bookmarks               # default | bookmarks | followers | following
+sonar --render table --limit 50      # table layout
+sonar --json                         # raw JSON output
+sonar --no-interactive               # disable interactive mode
 ```
 
-### Interests
+### Feed — read-only view
 
 ```bash
-pnpm run cli -- interests                          # list all
-pnpm run cli -- interests --json                   # JSON output
-
-# Create manually
-pnpm run cli -- interests create \
-  --name "Rust Systems" \
-  --description "Rust, compilers, and systems tooling" \
-  --keywords "rust,cargo,wasm" \
-  --topics "systems programming,performance"
-
-# Create from a natural language prompt (requires OPENAI_API_KEY or ANTHROPIC_API_KEY)
-pnpm run cli -- interests create \
-  --from-prompt "I want to follow AI evals and agent infra"
-
-# Update
-pnpm run cli -- interests update --id <id> --name "New Name"
-pnpm run cli -- interests update --id <id> --add-keywords "mcp,langgraph"
-pnpm run cli -- interests update --id <id> --remove-topics "old-topic"
+sonar feed                           # read-only feed (last 12h, limit 20)
+sonar feed --hours 48 --limit 50     # widen window
+sonar feed --kind bookmarks          # bookmarks | followers | following
+sonar feed --render table            # table layout
+sonar feed --json | jq .             # pipe to jq
 ```
 
-### Feed
+#### Streaming with --follow
+
+Poll for new items continuously and stream them to your terminal or another process:
 
 ```bash
-pnpm run cli -- feed                          # last 12h, limit 20, card render
-pnpm run cli -- feed --hours 24
-pnpm run cli -- feed --days 3
-pnpm run cli -- feed --kind bookmarks         # default | bookmarks | followers | following
-pnpm run cli -- feed --render table --limit 50
-pnpm run cli -- feed --interactive
-pnpm run cli -- feed --json
+sonar feed --follow                  # poll every 30s, visual cards
+sonar feed --follow --interval 10    # poll every 10s
+sonar feed --follow --json           # NDJSON stream (one JSON per line)
+sonar feed --follow --json | jq --unbuffered '.score'
 ```
 
-### Inbox
+Press `q` to quit follow mode.
+
+### Topics
 
 ```bash
-pnpm run cli -- inbox                         # list inbox suggestions
-pnpm run cli -- inbox --all
-pnpm run cli -- inbox --status inbox --limit 50
-pnpm run cli -- inbox --interactive
-pnpm run cli -- inbox --json
-
-pnpm run cli -- inbox read --id <suggestion_id>
-pnpm run cli -- inbox skip --id <suggestion_id>
-pnpm run cli -- inbox later --id <suggestion_id>
-pnpm run cli -- inbox archive --id <suggestion_id>
+sonar topics                         # list all topics
+sonar topics --json                  # JSON output
+sonar topics add "AI agents"         # add a topic
+sonar topics view <id>               # view a topic
+sonar topics edit <id> --name "New Name"
+sonar topics delete <id>             # delete a topic
 ```
 
-### Indexing
+#### AI-powered topic suggestions
+
+Let Sonar suggest new topics based on your existing interests and recent feed:
 
 ```bash
-pnpm run cli -- reindex                       # run all jobs
-pnpm run cli -- reindex tweets
-pnpm run cli -- reindex graph
-pnpm run cli -- reindex graph --force
-pnpm run cli -- reindex suggestions --days 1
-pnpm run cli -- reindex bookmarks
-pnpm run cli -- reindex status
-pnpm run cli -- reindex status --watch
+sonar topics suggest                 # interactive — y/n/q per suggestion
+sonar topics suggest --count 3       # limit to 3 suggestions
+sonar topics suggest --vendor anthropic  # use Anthropic instead of OpenAI
+sonar topics suggest --json          # raw suggestions as JSON
 ```
 
-### Local Data
+Requires `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` depending on vendor.
+
+### Account
 
 ```bash
-pnpm run cli -- data download     # full download → ~/.sonar/data.db
-pnpm run cli -- data sync         # incremental sync
-pnpm run cli -- data path         # print DB path
-pnpm run cli -- data sql          # open sqlite3 shell
+sonar account                        # list accounts, * marks active
+sonar account add <key>              # add account (random name)
+sonar account add <key> --alias work # add with custom name
+sonar account switch <name>          # switch active account
+sonar account rename <old> <new>     # rename an account
+sonar account remove <name>          # remove (--force if active)
+```
+
+### Refresh
+
+```bash
+sonar refresh                        # full pipeline (all steps)
+sonar refresh --bookmarks            # just sync bookmarks from X
+sonar refresh --likes                # just sync likes from X
+sonar refresh --graph                # just rebuild social graph
+sonar refresh --tweets               # just index tweets
+sonar refresh --suggestions          # just regenerate suggestions
+sonar refresh --likes --bookmarks    # any combo of flags
+```
+
+### Status
+
+```bash
+sonar status                         # account status, queue activity
+sonar status --watch                 # poll every 2s
+```
+
+### Triage
+
+```bash
+sonar skip --id <suggestion_id>      # skip a suggestion
+sonar later --id <suggestion_id>     # save for later
+sonar archive --id <suggestion_id>   # archive a suggestion
+```
+
+### Data
+
+```bash
+sonar data pull                      # download feed/suggestions/topics to local SQLite
+sonar data backup                    # backup local DB
+sonar data restore --from <path>     # restore from backup
+sonar data verify                    # integrity check
+sonar data path                      # show DB location
+sonar data sql                       # query helper
+```
+
+### Config
+
+```bash
+sonar config                         # show current config
+sonar config setup --key=<API_KEY>   # legacy setup
+sonar config set vendor anthropic    # set AI vendor
+sonar config skill --install         # install OpenClaw skill (--force to overwrite)
 ```
 
 ---
 
 ## Environment Variables
 
-| Variable | Required | Purpose |
-|---|---|---|
-| `SONAR_API_KEY` | Yes (unless saved by `init`) | Auth token |
-| `SONAR_API_URL` | No | GraphQL endpoint (default: `http://localhost:8000/graphql`) |
-| `SONAR_AI_VENDOR` | No | AI vendor for prompt generation (`openai` or `anthropic`) |
-| `SONAR_FEED_RENDER` | No | Default render style (`card` or `table`) |
-| `SONAR_FEED_WIDTH` | No | Default card width |
-| `OPENAI_API_KEY` | Sometimes | Required for OpenAI-powered `--from-prompt` |
-| `ANTHROPIC_API_KEY` | Sometimes | Required for Anthropic-powered `--from-prompt` |
+| Variable            | Required             | Purpose                                                             |
+| ------------------- | -------------------- | ------------------------------------------------------------------- |
+| `SONAR_API_URL`     | No                   | GraphQL endpoint (default: production API)                          |
+| `SONAR_MAX_RETRIES` | No                   | Max retry attempts on transient failures (default: 3, 0 to disable) |
+| `OPENAI_API_KEY`    | For `topics suggest` | Required when using OpenAI vendor for AI suggestions                |
+| `ANTHROPIC_API_KEY` | For `topics suggest` | Required when using Anthropic vendor for AI suggestions             |
 
 ## Local Files
 
-| Path | Contents |
-|---|---|
+| Path                   | Contents                     |
+| ---------------------- | ---------------------------- |
 | `~/.sonar/config.json` | Token, API URL, CLI defaults |
-| `~/.sonar/data.db` | Local synced SQLite database |
+| `~/.sonar/data.db`     | Local synced SQLite database |
+
+---
+
+## Drift Prevention Checks
+
+```bash
+# Run all drift checks (surface/docs/data/schema)
+pnpm drift:check
+
+# Refresh committed command snapshot after intentional command changes
+pnpm drift:surface:update
+```
+
+`drift:schema:check` validates GraphQL documents against the live schema.
+Locally, it skips when offline; in CI (`CI=true`) it is enforced.
 
 ---
 
 ## Troubleshooting
 
-**`No token found. Set SONAR_API_KEY or run: sonar init`**
-Set `SONAR_API_KEY` in your environment, then run `pnpm run cli -- init`.
+**`No token found. Run: sonar account add <name> <key>`**
+Add an account with `sonar account add <YOUR_KEY>`. Get a key at [sonar.8640p.info](https://sonar.8640p.info/).
 
 **`Unable to reach server, please try again shortly.`**
-Check `SONAR_API_URL`, your network, and API availability.
-
-**`OPENAI_API_KEY is not set` / `ANTHROPIC_API_KEY is not set`**
-Set the key for your chosen vendor before using `--from-prompt` or interactive reply generation.
+Check your network connection and API availability. The CLI automatically retries transient failures (network errors, 5xx) up to 3 times with exponential backoff. Use `--debug` to see retry attempts. Set `SONAR_MAX_RETRIES=0` to disable retries.

@@ -10,6 +10,14 @@ function extractJSON(text: string): string {
   return stripped.slice(start, end + 1)
 }
 
+function extractJSONArray(text: string): string {
+  const stripped = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
+  const start = stripped.indexOf('[')
+  const end = stripped.lastIndexOf(']')
+  if (start === -1 || end === -1) throw new Error('No JSON array found in response')
+  return stripped.slice(start, end + 1)
+}
+
 export interface GeneratedInterest {
   name: string
   description: string
@@ -37,60 +45,113 @@ Optimise every field for semantic density and current relevance, not readability
 
 Respond ONLY with valid JSON, no markdown, no explanation.`
 
-async function callOpenAI(prompt: string, apiKey: string): Promise<GeneratedInterest> {
-  const res = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o',
-      tools: [{ type: 'web_search_preview' }],
-      instructions: SYSTEM_PROMPT,
-      input: prompt,
-    }),
-  })
+// OpenAI uses web_search_preview which can legitimately take 30-60 s.
+export const OPENAI_TIMEOUT_MS = 90_000
+// Anthropic calls are simpler — 60 s is generous.
+export const ANTHROPIC_TIMEOUT_MS = 60_000
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(`OpenAI error: ${(err as any)?.error?.message ?? res.status}`)
+/**
+ * Wraps fetch() with an AbortController timeout that covers the full response
+ * cycle — headers AND body. The processResponse callback receives the Response
+ * and is responsible for consuming the body (e.g. calling res.json()). The
+ * timer is kept alive until processResponse resolves or rejects, ensuring a
+ * stalled body download is caught just like a stalled connection.
+ */
+async function fetchWithTimeout<T>(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+  vendorLabel: string,
+  processResponse: (res: Response) => Promise<T>,
+): Promise<T> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const res = await fetch(url, { ...init, signal: controller.signal })
+    return await processResponse(res)
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      const lines: string[] = [
+        `${vendorLabel} request timed out after ${timeoutMs / 1000}s.`,
+        'Possible causes:',
+        '  • The AI provider is overloaded or rate-limiting you',
+        '  • Your network connection is slow or unstable',
+      ]
+      if (vendorLabel.toLowerCase().includes('openai')) {
+        lines.push('  • The web_search tool (OpenAI) took longer than usual')
+      }
+      lines.push('Try again in a moment, or use --vendor to switch providers.')
+      throw new Error(lines.join('\n'))
+    }
+    throw err
+  } finally {
+    clearTimeout(timer)
   }
+}
 
-  const data = await res.json()
-  const text = data.output
-    ?.filter((b: any) => b.type === 'message')
-    .flatMap((b: any) => b.content)
-    .filter((c: any) => c.type === 'output_text')
-    .map((c: any) => c.text)
-    .join('') ?? ''
-
-  return JSON.parse(extractJSON(text)) as GeneratedInterest
+async function callOpenAI(prompt: string, apiKey: string): Promise<GeneratedInterest> {
+  return fetchWithTimeout(
+    'https://api.openai.com/v1/responses',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        tools: [{ type: 'web_search_preview' }],
+        instructions: SYSTEM_PROMPT,
+        input: prompt,
+      }),
+    },
+    OPENAI_TIMEOUT_MS,
+    'OpenAI',
+    async (res) => {
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(`OpenAI error: ${(err as any)?.error?.message ?? res.status}`)
+      }
+      const data = await res.json()
+      const text = data.output
+        ?.filter((b: any) => b.type === 'message')
+        .flatMap((b: any) => b.content)
+        .filter((c: any) => c.type === 'output_text')
+        .map((c: any) => c.text)
+        .join('') ?? ''
+      return JSON.parse(extractJSON(text)) as GeneratedInterest
+    },
+  )
 }
 
 async function callAnthropic(prompt: string, apiKey: string): Promise<GeneratedInterest> {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
+  return fetchWithTimeout(
+    'https://api.anthropic.com/v1/messages',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: prompt }],
+      }),
     },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  })
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(`Anthropic error: ${(err as any)?.error?.message ?? res.status}`)
-  }
-
-  const data = await res.json()
-  return JSON.parse(extractJSON(data.content[0].text)) as GeneratedInterest
+    ANTHROPIC_TIMEOUT_MS,
+    'Anthropic',
+    async (res) => {
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(`Anthropic error: ${(err as any)?.error?.message ?? res.status}`)
+      }
+      const data = await res.json()
+      return JSON.parse(extractJSON(data.content[0].text)) as GeneratedInterest
+    },
+  )
 }
 
 export interface GeneratedReply {
@@ -104,29 +165,34 @@ async function callOpenAIReply(tweetText: string, userPrompt: string, apiKey: st
     ? `Original tweet: "${tweetText}"\n\nAngle for reply: ${userPrompt}`
     : `Original tweet: "${tweetText}"\n\nWrite a thoughtful reply.`
 
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
+  return fetchWithTimeout(
+    'https://api.openai.com/v1/chat/completions',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: REPLY_SYSTEM_PROMPT },
+          { role: 'user', content: userContent },
+        ],
+      }),
     },
-    body: JSON.stringify({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: REPLY_SYSTEM_PROMPT },
-        { role: 'user', content: userContent },
-      ],
-    }),
-  })
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(`OpenAI error: ${(err as any)?.error?.message ?? res.status}`)
-  }
-
-  const data = await res.json()
-  const text = data.choices?.[0]?.message?.content ?? ''
-  return JSON.parse(extractJSON(text)) as GeneratedReply
+    OPENAI_TIMEOUT_MS,
+    'OpenAI',
+    async (res) => {
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(`OpenAI error: ${(err as any)?.error?.message ?? res.status}`)
+      }
+      const data = await res.json()
+      const text = data.choices?.[0]?.message?.content ?? ''
+      return JSON.parse(extractJSON(text)) as GeneratedReply
+    },
+  )
 }
 
 async function callAnthropicReply(tweetText: string, userPrompt: string, apiKey: string): Promise<GeneratedReply> {
@@ -134,28 +200,33 @@ async function callAnthropicReply(tweetText: string, userPrompt: string, apiKey:
     ? `Original tweet: "${tweetText}"\n\nAngle for reply: ${userPrompt}`
     : `Original tweet: "${tweetText}"\n\nWrite a thoughtful reply.`
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
+  return fetchWithTimeout(
+    'https://api.anthropic.com/v1/messages',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 512,
+        system: REPLY_SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: userContent }],
+      }),
     },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 512,
-      system: REPLY_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userContent }],
-    }),
-  })
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(`Anthropic error: ${(err as any)?.error?.message ?? res.status}`)
-  }
-
-  const data = await res.json()
-  return JSON.parse(extractJSON(data.content[0].text)) as GeneratedReply
+    ANTHROPIC_TIMEOUT_MS,
+    'Anthropic',
+    async (res) => {
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(`Anthropic error: ${(err as any)?.error?.message ?? res.status}`)
+      }
+      const data = await res.json()
+      return JSON.parse(extractJSON(data.content[0].text)) as GeneratedReply
+    },
+  )
 }
 
 export async function generateReply(
@@ -189,6 +260,106 @@ export async function generateInterest(prompt: string, vendor: Vendor): Promise<
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set')
     return callAnthropic(prompt, apiKey)
+  }
+
+  throw new Error(`Unknown vendor: ${vendor}. Supported: openai, anthropic`)
+}
+
+// ─── Topic Suggestions ───────────────────────────────────────────────────────
+
+const SUGGEST_SYSTEM_PROMPT = `You suggest new topics for a social intelligence tool that tracks interests on X (Twitter). Given the user's existing topics and a sample of recent tweets from their feed, suggest new topics that are adjacent to but distinct from what they already track.
+
+For each suggestion, return a JSON object with:
+- name: short, specific interest name (3-6 words, title case)
+- description: a dense, jargon-rich passage written in the voice of a practitioner deeply embedded in this space. Pack it with domain-specific terminology, key concepts, tools, notable figures, and current developments.
+- keywords: 12-20 specific, high-signal terms used by practitioners
+- relatedTopics: 6-10 adjacent topic areas
+
+Respond ONLY with a valid JSON array of objects. No markdown, no explanation.`
+
+export async function generateTopicSuggestions(
+  existingTopics: string[],
+  recentTweets: string[],
+  count: number,
+  vendor: Vendor,
+): Promise<GeneratedInterest[]> {
+  const topicList = existingTopics.length > 0
+    ? `My current topics:\n${existingTopics.map(t => `- ${t}`).join('\n')}`
+    : 'I have no topics yet.'
+
+  const tweetSample = recentTweets.length > 0
+    ? `\n\nRecent tweets from my feed:\n${recentTweets.slice(0, 15).map(t => `- ${t.slice(0, 200)}`).join('\n')}`
+    : ''
+
+  const prompt = `${topicList}${tweetSample}\n\nSuggest exactly ${count} new topics I should track. Return a JSON array.`
+
+  if (vendor === 'openai') {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) throw new Error('OPENAI_API_KEY is not set')
+    return fetchWithTimeout(
+      'https://api.openai.com/v1/responses',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          tools: [{ type: 'web_search_preview' }],
+          instructions: SUGGEST_SYSTEM_PROMPT,
+          input: prompt,
+        }),
+      },
+      OPENAI_TIMEOUT_MS,
+      'OpenAI',
+      async (res) => {
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(`OpenAI error: ${(err as any)?.error?.message ?? res.status}`)
+        }
+        const data = await res.json()
+        const text = data.output
+          ?.filter((b: any) => b.type === 'message')
+          .flatMap((b: any) => b.content)
+          .filter((c: any) => c.type === 'output_text')
+          .map((c: any) => c.text)
+          .join('') ?? ''
+        return JSON.parse(extractJSONArray(text)) as GeneratedInterest[]
+      },
+    )
+  }
+
+  if (vendor === 'anthropic') {
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set')
+    return fetchWithTimeout(
+      'https://api.anthropic.com/v1/messages',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 4096,
+          system: SUGGEST_SYSTEM_PROMPT,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      },
+      ANTHROPIC_TIMEOUT_MS,
+      'Anthropic',
+      async (res) => {
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(`Anthropic error: ${(err as any)?.error?.message ?? res.status}`)
+        }
+        const data = await res.json()
+        return JSON.parse(extractJSONArray(data.content[0].text)) as GeneratedInterest[]
+      },
+    )
   }
 
   throw new Error(`Unknown vendor: ${vendor}. Supported: openai, anthropic`)
